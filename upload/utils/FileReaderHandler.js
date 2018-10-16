@@ -20,10 +20,14 @@ function FileReaderHandler(FileBlob, callback) {
     reader.onerror = ErrorHandler;
     reader.onloadend = function (e) {
         if (e.target.readyState == FileReader.DONE) {
+            var uInt8Arr = new Uint8Array(e.target.result);
             var result = e.target.result;
             callback && callback(result);
         }
     }
 
-    reader.readAsBinaryString(FileBlob);
+    // reader.readAsArrayBuffer(FileBlob);
+    reader.readAsDataURL(FileBlob);
 }
+
+//[Typedarray]:http://javascript.ruanyifeng.com/stdlib/arraybuffer.html#toc5

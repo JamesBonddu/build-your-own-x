@@ -1,0 +1,32 @@
+[x] 二进制文件传输时的编码问题,导致md5计算结果不一致.
+    解决方式: 
+    上传 blob slice后的块,
+        前台先md5算一下该blob转base64后的字符串结果,
+        在后台再将直接上传的`application/octet-stream`类型的数据进行base64编码后再解码同前台传递的base64编码进行比较.
+    为什么直接传递blob经过base64编码后的东西?
+        因为这个东西会导致传输缓慢.
+
+[] 对于已经传输过的分块先进行查询,由服务端决定从哪个offset进行继续传输.
+
+[x] net::ERR_CONTENT_LENGTH_MISMATCH 206 (PARTIAL CONTENT)问题解决
+    解决方式:
+        HTTP Response头部显示指定Content-Length等于实际Response body长度  
+    复现场景:
+        HTTP Response头部显示指定Content-Length大于实际Response body长度
+
+[] http Partial Content 实现分块下载的HTTP接口.
+
+[] 复用一个链接进行多个chunk的发送.
+
+[X] 上传进度显示.
+
+
+> Refrence
+
+[http_range]:https://www.cnblogs.com/plokmju/p/http_range.html
+
+[HTTP Content-Length深入实践]:https://www.jianshu.com/p/d606732f2ebc
+
+[content-length引发的血案]:https://segmentfault.com/a/1190000011920471
+
+[python torando 大文件秒传]:https://suadminwen.github.io/2017/07/29/%E5%AE%9E%E7%8E%B0python%20tornado%E6%A1%86%E6%9E%B6%E4%B8%8B%E7%9A%84%E5%A4%A7%E6%96%87%E4%BB%B6%E7%A7%92%E4%BC%A0%E7%AD%89%E6%8A%80%E6%9C%AF%EF%BC%883%EF%BC%89/

@@ -107,3 +107,15 @@ function checkFileType(type, file, back) {
         back(type);
     }
 }
+
+
+function ConstructUploadForm(blob, file, md5, start, end) {
+    var fd = new FormData();
+    fd.append("filecontent", blob);
+    fd.append("filemd5", md5);
+    fd.append("filename", file.name);
+    fd.append("filesize", file.size);
+    // fd.append("PartNumer", PartNums);
+    fd.append("Index", [start, end]);
+    return fd;
+}

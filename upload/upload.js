@@ -7,26 +7,44 @@ var sizeBtn = document.querySelector("#size");
 var url = "http://192.168.18.198/upload/uploadbysize"
 
 // var uploaders = [];
-function UploadBySize(ajaxType, url, file, start, end) {
+var blobList = [];
+
+function progressHandler(molecule, denominator) {
+    var factor = Math.ceil(molecule / denominator * 100);
+    progressBar.innerHTML = factor + "%";
+}
+
+function UploadBySize(ajaxType, url, file, offset) {
     var SIZE = file.size;
     var BYTES_PER_CHUNK = 1 * 1024 * 1024;// 1M chunk size
     var Parts = Math.ceil(SIZE/BYTES_PER_CHUNK);
+    var start = offset * BYTES_PER_CHUNK;
+    var end = Math.min(file.size, (offset + 1) * BYTES_PER_CHUNK);
 
     var FileBlob = file.slice(start, end);
+   
     FileReaderHandler(FileBlob, function (FileContent){
-        var FileContentMd5 = md5(FileContent);
-        var ChunkBlob = ConstructUploadForm(FileBlob, file, FileContentMd5, start, end);
-
         var xhr = new XMLHttpRequest();
+        // [注意note]:https://developer.mozilla.org/en-US/docs/Web/API/FileReader/readAsDataURL
+        FileContent = FileContent.split(",")[1];
+
+        var FileContentMd5 = md5(FileContent);
+        var ChunkBlob = ConstructUploadForm(FileBlob, file, FileContentMd5, offset);
+
         xhr.open(ajaxType, url, true);
         xhr.timeout = 2000;
-    
+
+        xhr.addEventListener("progress", progressHandler.bind(null, end, SIZE), false);
+        //xhr.setRequestHeader("If-None-Match", FileContentMd5);
+        // xhr.setRequestHeader("If-Range", '"'+ FileContentMd5 + '"');
+        xhr.setRequestHeader("range", "bytes="+ start + "-"+ end);
+
+        if(Parts - 1 === offset){
+            xhr.setRequestHeader("X-ng8w-uploaded", true);
+            console.log("**** uploaded success! ****");
+        }
+
         xhr.onload = function(e) {
-            console.log(e)
-        };
-    
-        xhr.onprogress = function(e) {
-            console.log("xhr on progress");
             console.log(e)
         };
     
@@ -34,13 +52,14 @@ function UploadBySize(ajaxType, url, file, start, end) {
     
         xhr.onreadystatechange = function() {
             if (xhr.readyState === 4) {
-                if (xhr.status === 200) {
-                    if (start < SIZE) {
-                        start = end;
-                        end = start + BYTES_PER_CHUNK;
-                        UploadBySize("POST", url, file, start, end);
+                if (xhr.status === 200 || xhr.status === 201 || xhr.status === 202 || xhr.status === 206) {
+                    if (end < SIZE) {
+                        offset += 1;
+                        UploadBySize("POST", url, file, offset);
                     }
-                } 
+                } else {
+                    UploadBySize("POST", url, file, offset);
+                }
             }
         }
         xhr.onerror = function(e) {
@@ -50,23 +69,25 @@ function UploadBySize(ajaxType, url, file, start, end) {
     });
 }
 
-function ConstructUploadForm(blob, file, md5, start, end) {
+function ConstructUploadForm(blob, file, fmd5, offset) {
     var fd = new FormData();
     fd.append("filecontent", blob);
-    fd.append("filemd5", md5);
+    fd.append("filemd5", fmd5);
+    fd.append("rawmd5", file.name);
     fd.append("filename", file.name);
     fd.append("filesize", file.size);
-    // fd.append("PartNumer", PartNums);
-    fd.append("Index", [start, end]);
+    fd.append("chunksize", 1 * 1024 * 1024);
+    fd.append("Index", offset);
     return fd;
 }
 
 uploadFile.addEventListener('change', function(e) {
     var file = this.files[0];
     var BYTES_PER_CHUNK = 1 * 1024 * 1024;// 1M chunk size
-    var start = 0;
-    var end = start + BYTES_PER_CHUNK;
-    UploadBySize("POST", url, file, start, end);
+    var offset = 0;
+    var start = offset * BYTES_PER_CHUNK;
+    var end = Math.min(file.size, (offset + 1) * BYTES_PER_CHUNK);
+    UploadBySize("POST", url, file, offset);
 });
 
 
@@ -128,6 +149,22 @@ HTTP2测试方法
 [how-to-serve-http-2-using-python]:https://medium.com/python-pandemonium/how-to-serve-http-2-using-python-5e5bbd1e7ff1
 [migrate_to_https_and_http2]:https://www.freemindworld.com/blog/2016/160301_migrate_to_https_and_http2.shtml
 
+ETAG
+[cache-introduction]:https://blog.techbridge.cc/2017/06/17/cache-introduction/
+[discussion-on-web-caching]:http://www.alloyteam.com/2016/03/discussion-on-web-caching/
+[how-to-check-if-jquery-ajax-request-header-status-is-304-not-modified]:https://stackoverflow.com/questions/5173656/how-to-check-if-jquery-ajax-request-header-status-is-304-not-modified
+
+上传时的编码问题
+[deal-with-http-header-encoding-for-file-download]:https://blog.robotshell.org/2012/deal-with-http-header-encoding-for-file-download/comment-page-1/
+[下载时中文乱码问题]:https://gist.github.com/xcaspar/b600629ec7d75e500e0d
+[深入分析 web 请求响应中的编码问题]:https://www.ibm.com/developerworks/cn/web/wa-lo-ecoding-response-problem/index.html
+
+上传策略-single request or mutipart chunk request
+[sending-file-in-single-request-or-in-several-chunks]:https://www.aurigma.com/docs/iuf/sending-file-in-single-request-or-in-several-chunks.htm#filePerRequest
+[aws s3 上传机制]:https://aws.amazon.com/cn/blogs/china/s3-multipul-upload-practice/
+[amazon-s3-depth-of-practice-series-s3-cli-depth-parsing-and-performance-testing]:https://aws.amazon.com/cn/blogs/china/amazon-s3-depth-of-practice-series-s3-cli-depth-parsing-and-performance-testing/
+
+[calc big file md5]:https://stackoverflow.com/questions/39112096/calcuate-md5-hash-of-a-large-file-using-javascript
 RPC
 [grpc]:https://grpc.io/
 

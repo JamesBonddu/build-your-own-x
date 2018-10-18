@@ -1,31 +1,64 @@
 大文件上传API
-ChunkAPI
-function ChunkBySize(file FileBolb, int ChunkSize)
-return [chunkBolb,...]
+---
 
-function ChunkByIndex(file FileBlob, int Start, int End) return ChunkBlob
+大文件上传分三个流程:
 
-ChunkBlob 的结构如下: { size: xxx, md5: xxx, fname: xxx, index: [start, end], content: fileBlobContent }
+- 第一阶段: 大文件列表上传(bgf_list), 针对每个item, 先执行分块读取,以计算各块的经过base64转码后计算的md5, 以及最终的md5;
 
-MutiPartUploadAPI
-function MutiPartUpload(url, ChunkBlob) 返回index, ETag return index, Etag
+- 第二阶段: 依据 `offset` 先检测该 `bg_file` 是否已经上传过;
+            - 若未上传过,执行上传该文件块;
+                - 上传成功,修改该`chunk`的上传状态,以及上传进度;
+                - 未上传成功,重新执行上传操作;
+            - 已经上传过, `offset`偏移后执行以上检测步骤
 
-function MutiPartUploadProgress(arr index)
+- 第三阶段: 某个bg_file的所有item的上传状态进行检测和校验,最终显示某个上传任务完成.
+    - 当bg_file上传完成向后台发起合并请求,等待后台重组后反馈合并完成(在此期间无法再次执行合并操作,针对查询操作是可以进行的.)
 
-Utils API
-计算MD5,放在RequestHeaders
 
-MD5.js
+var bgf_list = [file,...];
 
-格式化文件大小
+resumeObj 可复原File对象结构
 
-function FormatFileSize(int FileSize) return FormateSize
+[{
+    file: file,
+    fname: file.name,
+    size: file.size,
+    type: file.type,
+    chunk_size: 1 * 1024 * 1024,
+    chunk_num: xx,//最终分几块
+    all_md5: xxx,
+    resume_chunk_obj_list: [
+        {
+            "chunk_md5": "xxx",
+            "upload_status": 0,//0 unprocessed; 1 processing; 2 finished.
+            "offset": x
+        }
+    ...]   
+}]
 
-TODO
-使用E-TAG,用来缓存传输
+阶段一:
 
-复用一个链接
+function calc_md5(resumeObj)
+    init offset
+    resumeObj.resume_chunk_obj_list[offset] = b64_md5
+    offset += 1
+    resumeObj.all_md5 = md5(resumeObj.chunk_md5.contact)
 
-在传输过程中出现异常, 导致链接中断后能够从断点处进行上传;(参照Resumable.js后,发现需要更好的数据结构和API的设计;)
 
-E-TAG
+阶段二:
+
+function is_uploaded_chunk(resumeObj)
+    init offset
+    GET request
+        if not uploaded:
+            upload_chunk
+                if success:
+                    offset += 1
+                else:
+                    upload_chunk
+        else:
+            offset += 1
+            is_uploaded_chunk
+    
+
+

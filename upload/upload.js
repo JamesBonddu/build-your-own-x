@@ -16,7 +16,7 @@ function progressHandler(molecule, denominator) {
 
 function UploadBySize(ajaxType, url, file, offset) {
     var SIZE = file.size;
-    var BYTES_PER_CHUNK = 1 * 1024 * 1024;// 1M chunk size
+    var BYTES_PER_CHUNK = 20 * 1024 * 1024;// 1M chunk size
     var Parts = Math.ceil(SIZE/BYTES_PER_CHUNK);
     var start = offset * BYTES_PER_CHUNK;
     var end = Math.min(file.size, (offset + 1) * BYTES_PER_CHUNK);
